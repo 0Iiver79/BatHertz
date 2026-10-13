@@ -132,7 +132,7 @@ function ecgAmp(p: number): number {
   return 0;
 }
 
-function ECGWave({ bpm, status }: { bpm: number; status: VStatus }) {
+function ECGWave({ bpm, status, samples = [] }: { bpm: number; status: VStatus; samples?: number[] }) {
   const ref   = useRef<HTMLCanvasElement>(null);
   const rafR  = useRef(0);
   const phase = useRef(0);
@@ -156,9 +156,20 @@ function ECGWave({ bpm, status }: { bpm: number; status: VStatus }) {
       for (let y = 0; y < H; y += 22 * dpr) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
       ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2*dpr;
       ctx.shadowColor = color; ctx.shadowBlur = 10; ctx.lineJoin = "round";
-      for (let px = 0; px < W; px++) {
-        const py = H*0.5 - ecgAmp((phase.current+px)/ppb)*H*0.36;
-        px===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+      if (samples.length > 1) {
+        const min = Math.min(...samples);
+        const max = Math.max(...samples);
+        const range = Math.max(1, max - min);
+        samples.forEach((sample, index) => {
+          const px = (index / (samples.length - 1)) * W;
+          const py = H * 0.9 - ((sample - min) / range) * H * 0.8;
+          index === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        });
+      } else {
+        for (let px = 0; px < W; px++) {
+          const py = H*0.5 - ecgAmp((phase.current+px)/ppb)*H*0.36;
+          px===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+        }
       }
       ctx.stroke(); ctx.shadowBlur = 0;
       const fw = 48*dpr;
@@ -173,7 +184,7 @@ function ECGWave({ bpm, status }: { bpm: number; status: VStatus }) {
     };
     rafR.current = requestAnimationFrame(draw);
     return () => { alive=false; cancelAnimationFrame(rafR.current); };
-  }, [bpm, color]);
+  }, [bpm, color, samples]);
   return <canvas ref={ref} className="w-full h-full block" />;
 }
 
@@ -472,6 +483,7 @@ export default function App() {
   const [temp, setTemp] = useState(36.6);
   const [spo2, setSpo2] = useState(98);
   const [ecg, setEcg] = useState<number | null>(null);
+  const [ecgSamples, setEcgSamples] = useState<number[]>([]);
   const [simMode,  setSimMode]  = useState<SimMode>("normal");
   const [chartTab, setChartTab] = useState<ChartTab>("hr");
   const [mobileTab, setMobileTab] = useState<MobileTab>("sinais");
@@ -481,6 +493,10 @@ export default function App() {
   const simTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const serialPortRef = useRef<SerialPortLike | null>(null);
   const serialReaderRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+  const ecgSamplesRef = useRef<number[]>([]);
+  const lastEcgUpdateRef = useRef(0);
+  const [serialRr, setSerialRr] = useState<number | null>(null);
+  const [serialTemp, setSerialTemp] = useState<number | null>(null);
   const [serialConnected, setSerialConnected] = useState(false);
   const [serialError, setSerialError] = useState<string | null>(null);
 
@@ -554,6 +570,11 @@ export default function App() {
     serialReaderRef.current = null;
     await serialPortRef.current?.close().catch(() => undefined);
     serialPortRef.current = null;
+    ecgSamplesRef.current = [];
+    setEcg(null);
+    setEcgSamples([]);
+    setSerialRr(null);
+    setSerialTemp(null);
     setSerialConnected(false);
   }, []);
 
@@ -587,11 +608,18 @@ export default function App() {
         for (const line of lines) {
           const vitals = parseSerialVitals(line);
           if (!vitals) continue;
-          if (vitals.ecg !== undefined) setEcg(vitals.ecg);
+          if (vitals.ecg !== undefined) {
+            setEcg(vitals.ecg);
+            ecgSamplesRef.current = [...ecgSamplesRef.current, vitals.ecg].slice(-500);
+            if (Date.now() - lastEcgUpdateRef.current > 50) {
+              lastEcgUpdateRef.current = Date.now();
+              setEcgSamples([...ecgSamplesRef.current]);
+            }
+          }
           if (vitals.heartRate !== undefined && vitals.heartRate > 0) setHr(vitals.heartRate);
           if (vitals.spo2 !== undefined && vitals.spo2 > 0) setSpo2(vitals.spo2);
-          if (vitals.rr !== undefined && vitals.rr > 0) setRr(vitals.rr);
-          if (vitals.temp !== undefined && vitals.temp > 0) setTemp(vitals.temp);
+          if (vitals.rr !== undefined && vitals.rr > 0) setSerialRr(vitals.rr);
+          if (vitals.temp !== undefined && vitals.temp > 0) setSerialTemp(vitals.temp);
         }
       }
     } catch (error) {
@@ -701,8 +729,10 @@ export default function App() {
   }, [hr, rr, temp]); // eslint-disable-line
 
   // ── Derived ─────────────────────────────────────────────────────────────────
-  const overall = useMemo(() => overallSt(hr, rr, temp), [hr, rr, temp]);
-  const recs    = useMemo(() => getRecommendations(Math.round(hr), Math.round(rr), temp), [hr, rr, temp]);
+  const displayedRr = serialConnected ? serialRr : rr;
+  const displayedTemp = serialConnected ? serialTemp : temp;
+  const overall = useMemo(() => overallSt(hr, displayedRr ?? 15, displayedTemp ?? 36.6), [hr, displayedRr, displayedTemp]);
+  const recs    = useMemo(() => getRecommendations(Math.round(hr), displayedRr ?? 15, displayedTemp ?? 36.6), [hr, displayedRr, displayedTemp]);
   const hrR = Math.round(hr), rrR = Math.round(rr);
   const critCount = events.filter(e => e.status === "critical").length;
 
@@ -743,8 +773,8 @@ export default function App() {
 
   const vitals = [
     { unit:"bpm", icon:<Heart size={14} fill="currentColor"/>, status:hrSt(hrR),    value:hrR,            label:"Freq.\nCardíaca",     sub: hrR>100?"Taquicardia":hrR<60?"Bradicardia":"Normal" },
-    { unit:"rpm", icon:<Wind size={14}/>,                      status:rrSt(rrR),    value:rrR,            label:"Freq.\nRespiratória", sub: rrR>20?"Taquipneia":rrR<12?"Bradipneia":"Normal"    },
-    { unit:"°C",  icon:<Thermometer size={14}/>,               status:tempSt(temp), value:temp.toFixed(1),label:"Tempe-\nratura",      sub: temp>38.5?"Febre Alta":temp>37.5?"Febre":temp<35?"Hipotermia":"Afebril" },
+    { unit:"rpm", icon:<Wind size={14}/>,                      status:displayedRr === null ? "normal" : rrSt(displayedRr),    value:displayedRr === null ? "--" : Math.round(displayedRr),            label:"Freq.\nRespiratória", sub: displayedRr === null ? "Sem leitura" : displayedRr>20?"Taquipneia":displayedRr<12?"Bradipneia":"Normal"    },
+    { unit:"°C",  icon:<Thermometer size={14}/>,               status:displayedTemp === null ? "normal" : tempSt(displayedTemp), value:displayedTemp === null ? "--" : displayedTemp.toFixed(1),label:"Tempe-\nratura",      sub: displayedTemp === null ? "Sem leitura" : displayedTemp>38.5?"Febre Alta":displayedTemp>37.5?"Febre":displayedTemp<35?"Hipotermia":"Afebril" },
     { unit:"%",   icon:<Activity size={14}/>,                  status:spo2St(spo2), value:spo2,            label:"Saturação\nSpO₂",       sub: spo2<90?"Baixa":"Normal" },
   ];
 
@@ -1025,7 +1055,9 @@ export default function App() {
               </div>
             </div>
             <div className="h-[160px]">
-              <iframe src={THINGSPEAK_URL} className="w-full h-full border-0" title="ECG em Tempo Real" loading="lazy"/>
+              {serialConnected && ecgSamples.length > 1
+                ? <ECGWave bpm={hrR} status={overall} samples={ecgSamples}/>
+                : <iframe src={THINGSPEAK_URL} className="w-full h-full border-0" title="ECG em Tempo Real" loading="lazy"/>}
             </div>
           </div>
 
@@ -1088,7 +1120,9 @@ export default function App() {
                   </div>
                 </div>
                 <div className="h-[140px]">
-                  <iframe src={THINGSPEAK_URL} className="w-full h-full border-0" title="ECG em Tempo Real" loading="lazy"/>
+                  {serialConnected && ecgSamples.length > 1
+                    ? <ECGWave bpm={hrR} status={overall} samples={ecgSamples}/>
+                    : <iframe src={THINGSPEAK_URL} className="w-full h-full border-0" title="ECG em Tempo Real" loading="lazy"/>}
                 </div>
               </div>
 
