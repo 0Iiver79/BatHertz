@@ -1,5 +1,6 @@
 {
-  "buildCommand": "npx vite build --config vite.figma.config.ts",
-  "outputDirectory": "dist"
+  "installCommand": "npm install --prefix \"Cardiac Health Monitoring Site\"",
+  "buildCommand": "npm --prefix \"Cardiac Health Monitoring Site\" run build",
+  "outputDirectory": "Cardiac Health Monitoring Site/dist",
   "framework": "vite"
 }

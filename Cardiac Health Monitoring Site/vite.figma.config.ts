@@ -42,7 +42,7 @@ export default defineConfig(async (env) =>
 )
 
 async function resolveUserConfig(env: ConfigEnv): Promise<UserConfig> {
-  return typeof userConfig === 'function' ? await userConfig(env) : await userConfig
+  return userConfig
 }
 
 function figmaPackageSchemeResolver(): Plugin {

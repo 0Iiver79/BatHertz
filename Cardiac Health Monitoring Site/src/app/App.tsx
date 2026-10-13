@@ -11,12 +11,13 @@ import {
 type VStatus    = "normal" | "warning" | "critical";
 type SimMode    = "normal" | "alerta";
 type ChartTab   = "hr" | "rr" | "temp";
+type HistoryMetric = ChartTab;
 type MobileTab  = "sinais" | "alertas" | "saude" | "contatos";
 type MotionState = "active" | "idle" | "dormant";
 type EcgView    = "ecg" | "sensor";
 
 type ChartConfig = {
-  dataKey: string; name: string; unit: string; color: string;
+  dataKey: HistoryMetric; name: string; unit: string; color: string;
   domain: [number, number]; refLo: number; refHi: number;
 };
 
@@ -381,7 +382,7 @@ function TrendChart({ height = 140, hrR, rrR, temp, chartTab, setChartTab, histo
   const VB_H = height - 8;
   const [dMin, dMax] = cc.domain;
   const clamp = (v: number) => Math.max(0, Math.min(VB_H, VB_H - ((v - dMin) / (dMax - dMin)) * VB_H));
-  const vals = history.map(p => (p as Record<string, number>)[cc.dataKey]);
+  const vals = history.map(p => p[cc.dataKey]);
   const pts = vals.map((v, i) => {
     const x = vals.length < 2 ? 0 : (i / (vals.length - 1)) * VB_W;
     return `${x.toFixed(1)},${clamp(v).toFixed(1)}`;
@@ -636,7 +637,7 @@ export default function App() {
   const fmtTs = (d: Date) =>
     `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:${String(d.getSeconds()).padStart(2,"0")}`;
 
-  const CHART_CFG = {
+  const CHART_CFG: Record<ChartTab, ChartConfig> = {
     hr:   { dataKey:"hr",   name:"FC",   unit:" bpm", color:COLOR[hrSt(hrR)],    domain:[40,160]  as [number,number], refLo:60,   refHi:100  },
     rr:   { dataKey:"rr",   name:"FR",   unit:" rpm", color:COLOR[rrSt(rrR)],    domain:[6,35]    as [number,number], refLo:12,   refHi:20   },
     temp: { dataKey:"temp", name:"Temp", unit:" °C",  color:COLOR[tempSt(temp)], domain:[34,41]   as [number,number], refLo:36.0, refHi:37.5 },
