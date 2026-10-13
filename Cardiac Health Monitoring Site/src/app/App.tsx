@@ -49,6 +49,7 @@ function classify(v: number, wLo: number, wHi: number, cLo: number, cHi: number)
 const hrSt   = (v: number) => classify(v, 60, 100, 45, 130);
 const rrSt   = (v: number) => classify(v, 12, 20,   8,  28);
 const tempSt = (v: number) => classify(v, 36.0, 37.5, 35.0, 38.5);
+const spo2St = (v: number) => classify(v, 95, 100, 90, 100);
 
 function overallSt(hr: number, rr: number, temp: number): VStatus {
   const s = [hrSt(Math.round(hr)), rrSt(Math.round(rr)), tempSt(temp)];
@@ -60,12 +61,43 @@ function overallSt(hr: number, rr: number, temp: number): VStatus {
 interface Contact { id: number; name: string; relation: string; phone: string; }
 interface IrregEvent { id: number; ts: Date; label: string; value: string; status: VStatus; }
 interface HistoryPoint { t: string; hr: number; rr: number; temp: number; }
+interface SerialVitals { ecg?: number; heartRate?: number; spo2?: number; rr?: number; temp?: number; }
 
 const DEFAULT_CONTACTS: Contact[] = [
   { id: 1, name: "Dr. Marcos Ribeiro",   relation: "Cardiologista",    phone: "(11) 98765-4321" },
   { id: 2, name: "Ana Lima",             relation: "Filha — Familiar", phone: "(21) 99234-5678" },
   { id: 3, name: "SAMU",                 relation: "Emergência",       phone: "192" },
 ];
+
+function parseSerialVitals(line: string): SerialVitals | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+
+  try {
+    const data = JSON.parse(trimmed) as Record<string, unknown>;
+    const number = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : undefined;
+    const heartRate = number(data.heartRate) ?? number(data.bpm);
+    const parsed = {
+      ecg: number(data.ecg),
+      heartRate,
+      spo2: number(data.spo2),
+      rr: number(data.rr),
+      temp: number(data.temp),
+    };
+    return Object.values(parsed).some(value => value !== undefined) ? parsed : null;
+  } catch {
+    const read = (pattern: RegExp) => {
+      const value = trimmed.match(pattern)?.[1];
+      return value === undefined ? undefined : Number(value);
+    };
+    const parsed = {
+      ecg: read(/ECG\s*:\s*(-?\d+(?:\.\d+)?)/i),
+      heartRate: read(/(?:BPM|M[eé]dia BPM)\s*:\s*(-?\d+(?:\.\d+)?)/i),
+      spo2: read(/SpO2\s*:\s*(-?\d+(?:\.\d+)?)/i),
+    };
+    return Object.values(parsed).some(value => value !== undefined) ? parsed : null;
+  }
+}
 
 function getRecommendations(hr: number, rr: number, temp: number) {
   const recs: { text: string; status: VStatus; action?: string }[] = [];
@@ -438,6 +470,8 @@ export default function App() {
   const [hr,   setHr]   = useState(72);
   const [rr,   setRr]   = useState(15);
   const [temp, setTemp] = useState(36.6);
+  const [spo2, setSpo2] = useState(98);
+  const [ecg, setEcg] = useState<number | null>(null);
   const [simMode,  setSimMode]  = useState<SimMode>("normal");
   const [chartTab, setChartTab] = useState<ChartTab>("hr");
   const [mobileTab, setMobileTab] = useState<MobileTab>("sinais");
@@ -445,6 +479,10 @@ export default function App() {
   const [events,   setEvents]   = useState<IrregEvent[]>([]);
   const eventId = useRef(1);
   const simTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const serialPortRef = useRef<SerialPortLike | null>(null);
+  const serialReaderRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+  const [serialConnected, setSerialConnected] = useState(false);
+  const [serialError, setSerialError] = useState<string | null>(null);
 
   // ── Contacts ────────────────────────────────────────────────────────────────
   const [contacts,   setContacts]   = useState<Contact[]>(DEFAULT_CONTACTS);
@@ -510,6 +548,64 @@ export default function App() {
       setAccelGranted(true); // non-iOS: no permission needed
     }
   }, []);
+
+  const disconnectSerial = useCallback(async () => {
+    await serialReaderRef.current?.cancel().catch(() => undefined);
+    serialReaderRef.current = null;
+    await serialPortRef.current?.close().catch(() => undefined);
+    serialPortRef.current = null;
+    setSerialConnected(false);
+  }, []);
+
+  const connectSerial = useCallback(async () => {
+    if (!navigator.serial) {
+      setSerialError("Use Chrome ou Edge para conectar o Arduino por USB.");
+      return;
+    }
+
+    try {
+      setSerialError(null);
+      await disconnectSerial();
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 9600 });
+      if (!port.readable) throw new Error("A porta Serial não disponibilizou dados.");
+
+      serialPortRef.current = port;
+      setSerialConnected(true);
+      const decoder = new TextDecoder();
+      const reader = port.readable.getReader();
+      serialReaderRef.current = reader;
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const vitals = parseSerialVitals(line);
+          if (!vitals) continue;
+          if (vitals.ecg !== undefined) setEcg(vitals.ecg);
+          if (vitals.heartRate !== undefined && vitals.heartRate > 0) setHr(vitals.heartRate);
+          if (vitals.spo2 !== undefined && vitals.spo2 > 0) setSpo2(vitals.spo2);
+          if (vitals.rr !== undefined && vitals.rr > 0) setRr(vitals.rr);
+          if (vitals.temp !== undefined && vitals.temp > 0) setTemp(vitals.temp);
+        }
+      }
+    } catch (error) {
+      await disconnectSerial();
+      if ((error as DOMException).name !== "NotFoundError") {
+        setSerialError("Não foi possível conectar ao Arduino. Confira a porta e a velocidade 9600.");
+      }
+    } finally {
+      serialReaderRef.current?.releaseLock();
+      serialReaderRef.current = null;
+    }
+  }, [disconnectSerial]);
+
+  useEffect(() => () => { void disconnectSerial(); }, [disconnectSerial]);
 
   useEffect(() => {
     if (!accelGranted) return;
@@ -580,6 +676,7 @@ export default function App() {
 
   // ── Simulation ──────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (serialConnected) return;
     const id = setInterval(() => {
       const em = simMode === "alerta";
       setHr  (p => Math.max(40, Math.min(180, p + (em ? 128  : 74   - p) * 0.09 + (Math.random() - 0.5) * (em ? 9    : 4   ))));
@@ -587,7 +684,7 @@ export default function App() {
       setTemp(p => Math.max(34, Math.min(42,  p + (em ? 38.9 : 36.6 - p) * 0.04 + (Math.random() - 0.5) * (em ? 0.18 : 0.07))));
     }, 1500);
     return () => clearInterval(id);
-  }, [simMode]);
+  }, [simMode, serialConnected]);
 
   // ── History + irregularity detection ────────────────────────────────────────
   useEffect(() => {
@@ -648,12 +745,13 @@ export default function App() {
     { unit:"bpm", icon:<Heart size={14} fill="currentColor"/>, status:hrSt(hrR),    value:hrR,            label:"Freq.\nCardíaca",     sub: hrR>100?"Taquicardia":hrR<60?"Bradicardia":"Normal" },
     { unit:"rpm", icon:<Wind size={14}/>,                      status:rrSt(rrR),    value:rrR,            label:"Freq.\nRespiratória", sub: rrR>20?"Taquipneia":rrR<12?"Bradipneia":"Normal"    },
     { unit:"°C",  icon:<Thermometer size={14}/>,               status:tempSt(temp), value:temp.toFixed(1),label:"Tempe-\nratura",      sub: temp>38.5?"Febre Alta":temp>37.5?"Febre":temp<35?"Hipotermia":"Afebril" },
+    { unit:"%",   icon:<Activity size={14}/>,                  status:spo2St(spo2), value:spo2,            label:"Saturação\nSpO₂",       sub: spo2<90?"Baixa":"Normal" },
   ];
 
   // ── Reusable sections ────────────────────────────────────────────────────────
 
   const VitalCards = ({ compact = false }: { compact?: boolean }) => (
-    <div className="grid grid-cols-3 gap-2.5">
+    <div className="grid grid-cols-4 gap-2.5">
       {vitals.map(v => (
         <div key={v.unit} className={`rounded-xl border border-white/[0.05] relative overflow-hidden ${compact ? "p-3" : "p-4"}`}
           style={{ background: "#0E1525" }}>
@@ -885,7 +983,19 @@ export default function App() {
 
         <div className="flex items-center gap-2 shrink-0">
           <LiveClock className="text-white/30 text-xs"/>
+          <button
+            onClick={() => serialConnected ? void disconnectSerial() : void connectSerial()}
+            title={serialError ?? (serialConnected ? "Desconectar Arduino" : "Conectar Arduino por USB")}
+            className="flex items-center gap-1.5 text-[10px] px-2.5 py-1.5 rounded-lg font-semibold border transition-all"
+            style={serialConnected
+              ? {background:"#00D4A818",borderColor:"#00D4A835",color:"#00D4A8"}
+              : {background:"rgba(255,255,255,0.04)",borderColor:"rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.45)"}}
+          >
+            <Radio size={12}/>
+            <span className="hidden sm:inline">{serialConnected ? "Arduino conectado" : "Conectar Arduino"}</span>
+          </button>
           <button onClick={toggleSim}
+            disabled={serialConnected}
             className="text-[10px] px-2.5 py-1.5 rounded-lg font-semibold border transition-all"
             style={simMode==="alerta"
               ?{background:"#FF4B6E18",borderColor:"#FF4B6E35",color:"#FF4B6E"}
