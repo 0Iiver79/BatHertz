@@ -51,8 +51,9 @@ const rrSt   = (v: number) => classify(v, 12, 20,   8,  28);
 const tempSt = (v: number) => classify(v, 36.0, 37.5, 35.0, 38.5);
 const spo2St = (v: number) => classify(v, 95, 100, 90, 100);
 
-function overallSt(hr: number, rr: number, temp: number): VStatus {
+function overallSt(hr: number, rr: number, temp: number, spo2?: number): VStatus {
   const s = [hrSt(Math.round(hr)), rrSt(Math.round(rr)), tempSt(temp)];
+  if (spo2 !== undefined) s.push(spo2St(spo2));
   if (s.includes("critical")) return "critical";
   if (s.includes("warning"))  return "warning";
   return "normal";
@@ -99,7 +100,7 @@ function parseSerialVitals(line: string): SerialVitals | null {
   }
 }
 
-function getRecommendations(hr: number, rr: number, temp: number) {
+function getRecommendations(hr: number, rr: number, temp: number, spo2?: number) {
   const recs: { text: string; status: VStatus; action?: string }[] = [];
   if      (hr > 130) recs.push({ text: "Taquicardia severa (FC > 130 bpm). Risco cardíaco elevado.", status: "critical", action: "Ligue 192 agora" });
   else if (hr > 100) recs.push({ text: "Frequência cardíaca elevada. Evite esforço e busque avaliação.", status: "warning", action: "Agende consulta" });
@@ -112,6 +113,10 @@ function getRecommendations(hr: number, rr: number, temp: number) {
   if      (temp > 38.5) recs.push({ text: "Febre alta. Busque atendimento médico.", status: "critical", action: "Consulta urgente" });
   else if (temp > 37.5) recs.push({ text: "Febre leve. Hidratação, repouso e monitoramento.", status: "warning" });
   else if (temp < 35.0) recs.push({ text: "Hipotermia detectada. Atendimento imediato.", status: "critical", action: "Ligue 192 agora" });
+  if (spo2 !== undefined) {
+    if (spo2 < 90) recs.push({ text: "Saturação de oxigênio muito baixa. Procure atendimento imediatamente.", status: "critical", action: "Ligue 192 agora" });
+    else if (spo2 < 95) recs.push({ text: "Saturação de oxigênio abaixo do esperado. Repita a medição em repouso.", status: "warning" });
+  }
   if (recs.length === 0)
     recs.push({ text: "Todos os sinais vitais estão dentro dos parâmetros normais. Continue monitorando.", status: "normal" });
   return recs;
@@ -497,6 +502,7 @@ export default function App() {
   const lastEcgUpdateRef = useRef(0);
   const [serialRr, setSerialRr] = useState<number | null>(null);
   const [serialTemp, setSerialTemp] = useState<number | null>(null);
+  const [serialSpo2, setSerialSpo2] = useState<number | null>(null);
   const [serialConnected, setSerialConnected] = useState(false);
   const [serialError, setSerialError] = useState<string | null>(null);
 
@@ -575,6 +581,7 @@ export default function App() {
     setEcgSamples([]);
     setSerialRr(null);
     setSerialTemp(null);
+    setSerialSpo2(null);
     setSerialConnected(false);
   }, []);
 
@@ -617,7 +624,10 @@ export default function App() {
             }
           }
           if (vitals.heartRate !== undefined && vitals.heartRate > 0) setHr(vitals.heartRate);
-          if (vitals.spo2 !== undefined && vitals.spo2 > 0) setSpo2(vitals.spo2);
+          if (vitals.spo2 !== undefined && vitals.spo2 > 0) {
+            setSpo2(vitals.spo2);
+            setSerialSpo2(vitals.spo2);
+          }
           if (vitals.rr !== undefined && vitals.rr > 0) setSerialRr(vitals.rr);
           if (vitals.temp !== undefined && vitals.temp > 0) setSerialTemp(vitals.temp);
         }
@@ -720,19 +730,24 @@ export default function App() {
     const ts  = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}:${String(now.getSeconds()).padStart(2,"0")}`;
     const hrR = Math.round(hr), rrR = Math.round(rr);
     setHistory(p => [...p, { t: ts, hr: hrR, rr: rrR, temp: parseFloat(temp.toFixed(1)) }].slice(-60));
-    const hS = hrSt(hrR), rS = rrSt(rrR), tS = tempSt(temp);
+    const hS = hrSt(hrR);
+    const rS = serialConnected ? (serialRr === null ? null : rrSt(serialRr)) : rrSt(rrR);
+    const tS = serialConnected ? (serialTemp === null ? null : tempSt(serialTemp)) : tempSt(temp);
+    const sS = serialConnected ? (serialSpo2 === null ? null : spo2St(serialSpo2)) : spo2St(spo2);
     const ne: IrregEvent[] = [];
     if (hS !== "normal") ne.push({ id: eventId.current++, ts: now, label: "Freq. Cardíaca",      value: `${hrR} bpm`,            status: hS });
-    if (rS !== "normal") ne.push({ id: eventId.current++, ts: now, label: "Freq. Respiratória",  value: `${rrR} rpm`,            status: rS });
-    if (tS !== "normal") ne.push({ id: eventId.current++, ts: now, label: "Temperatura",          value: `${temp.toFixed(1)} °C`, status: tS });
+    if (rS && rS !== "normal") ne.push({ id: eventId.current++, ts: now, label: "Freq. Respiratória",  value: `${serialRr ?? rrR} rpm`,            status: rS });
+    if (tS && tS !== "normal") ne.push({ id: eventId.current++, ts: now, label: "Temperatura",          value: `${(serialTemp ?? temp).toFixed(1)} °C`, status: tS });
+    if (sS && sS !== "normal") ne.push({ id: eventId.current++, ts: now, label: "Saturação de O₂",      value: `${serialSpo2 ?? spo2}%`, status: sS });
     if (ne.length) setEvents(p => [...ne, ...p].slice(0, 40));
-  }, [hr, rr, temp]); // eslint-disable-line
+  }, [hr, rr, temp, spo2, serialConnected, serialRr, serialTemp, serialSpo2]);
 
   // ── Derived ─────────────────────────────────────────────────────────────────
   const displayedRr = serialConnected ? serialRr : rr;
   const displayedTemp = serialConnected ? serialTemp : temp;
-  const overall = useMemo(() => overallSt(hr, displayedRr ?? 15, displayedTemp ?? 36.6), [hr, displayedRr, displayedTemp]);
-  const recs    = useMemo(() => getRecommendations(Math.round(hr), displayedRr ?? 15, displayedTemp ?? 36.6), [hr, displayedRr, displayedTemp]);
+  const displayedSpo2 = serialConnected ? serialSpo2 : spo2;
+  const overall = useMemo(() => overallSt(hr, displayedRr ?? 15, displayedTemp ?? 36.6, displayedSpo2 ?? undefined), [hr, displayedRr, displayedTemp, displayedSpo2]);
+  const recs    = useMemo(() => getRecommendations(Math.round(hr), displayedRr ?? 15, displayedTemp ?? 36.6, displayedSpo2 ?? undefined), [hr, displayedRr, displayedTemp, displayedSpo2]);
   const hrR = Math.round(hr), rrR = Math.round(rr);
   const critCount = events.filter(e => e.status === "critical").length;
 
@@ -775,7 +790,7 @@ export default function App() {
     { unit:"bpm", icon:<Heart size={14} fill="currentColor"/>, status:hrSt(hrR),    value:hrR,            label:"Freq.\nCardíaca",     sub: hrR>100?"Taquicardia":hrR<60?"Bradicardia":"Normal" },
     { unit:"rpm", icon:<Wind size={14}/>,                      status:displayedRr === null ? "normal" : rrSt(displayedRr),    value:displayedRr === null ? "--" : Math.round(displayedRr),            label:"Freq.\nRespiratória", sub: displayedRr === null ? "Sem leitura" : displayedRr>20?"Taquipneia":displayedRr<12?"Bradipneia":"Normal"    },
     { unit:"°C",  icon:<Thermometer size={14}/>,               status:displayedTemp === null ? "normal" : tempSt(displayedTemp), value:displayedTemp === null ? "--" : displayedTemp.toFixed(1),label:"Tempe-\nratura",      sub: displayedTemp === null ? "Sem leitura" : displayedTemp>38.5?"Febre Alta":displayedTemp>37.5?"Febre":displayedTemp<35?"Hipotermia":"Afebril" },
-    { unit:"%",   icon:<Activity size={14}/>,                  status:spo2St(spo2), value:spo2,            label:"Saturação\nSpO₂",       sub: spo2<90?"Baixa":"Normal" },
+    { unit:"%",   icon:<Activity size={14}/>,                  status:displayedSpo2 === null ? "normal" : spo2St(displayedSpo2), value:displayedSpo2 === null ? "--" : displayedSpo2, label:"Saturação\nSpO₂",       sub: displayedSpo2 === null ? "Sem leitura" : displayedSpo2<90?"Baixa":"Normal" },
   ];
 
   // ── Reusable sections ────────────────────────────────────────────────────────
