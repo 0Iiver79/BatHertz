@@ -1,6 +1,6 @@
 {
-  "installCommand": "npm install --prefix \"Cardiac Health Monitoring Site\"",
-  "buildCommand": "npm --prefix \"Cardiac Health Monitoring Site\" run build",
-  "outputDirectory": "Cardiac Health Monitoring Site/dist",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "framework": "vite"
 }
