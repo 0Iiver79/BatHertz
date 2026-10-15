@@ -1,4 +1,4 @@
-# CardioWatch - Monitoramento Cardíaco
+# BatHerz - Monitoramento Cardíaco
 
 Projeto desenvolvido para a Mostra Cultural com finalidade educacional. O sistema demonstra como sensores podem coletar sinais cardíacos e como um painel web pode apresentar esses dados.
 
@@ -9,7 +9,7 @@ Projeto desenvolvido para a Mostra Cultural com finalidade educacional. O sistem
 O projeto possui duas partes:
 
 1. **Arduino e sensores:** coleta dados do AD8232 e do MAX30102.
-2. **CardioWatch:** painel web publicado na Vercel que pode receber dados pela porta USB do Arduino.
+2. **BatHerz:** painel web publicado na Vercel que pode receber dados pela porta USB do Arduino.
 
 Site publicado:
 
@@ -98,7 +98,7 @@ Arduino Uno
 Navegador Chrome ou Edge
         |
         v
-Painel CardioWatch na Vercel
+Painel BatHerz na Vercel
 ```
 
 O Arduino pode enviar linhas como:
@@ -193,10 +193,10 @@ npm run build
 - **Eletrônica:** montagem da protoboard, alimentação e pinagem.
 - **Sensores:** funcionamento do AD8232 e do MAX30102.
 - **Programação embarcada:** leitura, cálculo e envio Serial.
-- **Interface:** painel CardioWatch e visualização dos dados.
+- **Interface:** painel BatHerz e visualização dos dados.
 - **Comunicação:** USB, ESP8266, ThingSpeak e Vercel.
 - **Responsabilidade:** segurança elétrica, privacidade e limites médicos.
 
 ## Conclusão
 
-O CardioWatch mostra um fluxo completo de prototipagem: o sensor coleta dados, o Arduino processa as leituras, a comunicação Serial transporta os valores e o painel web apresenta as informações. O resultado deve ser tratado como uma demonstração educacional de tecnologia, e não como um dispositivo médico.
+O BatHerz mostra um fluxo completo de prototipagem: o sensor coleta dados, o Arduino processa as leituras, a comunicação Serial transporta os valores e o painel web apresenta as informações. O resultado deve ser tratado como uma demonstração educacional de tecnologia, e não como um dispositivo médico.

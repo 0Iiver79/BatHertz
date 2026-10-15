@@ -1,10 +1,10 @@
-# Guia do Grupo - CardioWatch
+# Guia do Grupo - BatHerz
 
 Este documento explica o estado atual do trabalho da Mostra Cultural, o processo completo e o que ainda precisa ser testado.
 
 ## 1. O que estamos construindo
 
-O CardioWatch é um protótipo educacional de monitoramento de sinais cardíacos.
+O BatHerz é um protótipo educacional de monitoramento de sinais cardíacos.
 
 O sistema reúne:
 
@@ -12,7 +12,7 @@ O sistema reúne:
 - Sensor ECG AD8232.
 - Sensor MAX30102 para BPM e SpO2.
 - ESP8266 para comunicação Wi-Fi com ThingSpeak.
-- Painel web CardioWatch para visualizar os dados.
+- Painel web BatHerz para visualizar os dados.
 
 O projeto serve para demonstrar a integração entre eletrônica, programação embarcada, comunicação Serial e desenvolvimento web.
 
@@ -50,7 +50,7 @@ Arduino Uno
 Chrome ou Edge
         |
         v
-Painel CardioWatch na Vercel
+Painel BatHerz na Vercel
 ```
 
 O ESP8266 é uma alternativa para enviar os dados por Wi-Fi ao ThingSpeak. Para o primeiro teste do painel, deve-se usar o cabo USB do Arduino, pois é mais simples verificar o funcionamento.

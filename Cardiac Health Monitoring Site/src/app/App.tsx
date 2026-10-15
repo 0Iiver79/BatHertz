@@ -997,7 +997,7 @@ export default function App() {
             <Heart size={13} className="text-black" fill="black"/>
           </div>
           <span className="text-white font-semibold text-sm hidden sm:block" style={{fontFamily:"'DM Serif Display', serif"}}>
-            CardioWatch
+            BatHerz
           </span>
         </div>
 
