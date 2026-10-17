@@ -125,7 +125,7 @@ O painel também aceita JSON:
 8. Posicione o dedo no MAX30102 e os eletrodos no AD8232.
 9. Aguarde alguns segundos para estabilizar as leituras.
 
-Sem Arduino conectado, o botão **Simular** permite demonstrar o funcionamento visual do painel. Com o Arduino conectado, a simulação é desativada.
+Sem Arduino conectado, o botão **Ativar simulação** permite demonstrar o funcionamento visual do painel. A simulação começa desligada e é desativada automaticamente quando o Arduino é conectado.
 
 ## O que o painel mostra
 

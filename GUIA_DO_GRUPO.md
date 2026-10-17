@@ -35,7 +35,7 @@ O painel já possui:
 - BPM e SpO2 recebidos do MAX30102.
 - ECG recebido do AD8232 e desenhado no painel.
 - Alertas para BPM e SpO2 fora dos limites.
-- Modo **Simular** para apresentação sem o hardware.
+- Modo **Ativar simulação** para apresentação sem o hardware, desligado por padrão.
 
 ## 3. Processo completo dos dados
 
@@ -118,7 +118,7 @@ ECG:512 | BPM:72 | SpO2:98%
 7. Coloque o dedo sobre o MAX30102, mantendo-o imóvel.
 8. Coloque os eletrodos do AD8232 corretamente.
 9. Observe o BPM, SpO2 e o traçado do ECG.
-10. Para testar sem Arduino, use o botão **Simular**.
+10. Para testar sem Arduino, clique em **Ativar simulação**. Para parar, clique em **Desativar simulação**.
 
 O navegador solicitará autorização para acessar a porta Serial. Essa autorização deve ser concedida manualmente.
 
@@ -174,7 +174,7 @@ Explicar que o projeto é uma demonstração educacional, não um dispositivo m�
 - Conferir se o ECG aparece no gráfico.
 - Conferir se BPM e SpO2 mudam conforme a leitura.
 - Testar a situação de eletrodo desconectado.
-- Testar o modo de simulação para a apresentação.
+- Testar a ativação e a desativação da simulação para a apresentação.
 - Confirmar que não há senha Wi-Fi ou API Key real publicada no GitHub.
 
 ## 10. Limitações atuais
@@ -207,7 +207,7 @@ Uma ordem simples para a apresentação:
 5. Conectar o Arduino ao computador.
 6. Abrir o painel e clicar em **Conectar Arduino**.
 7. Mostrar BPM, SpO2 e ECG.
-8. Explicar o modo de simulação como alternativa.
+8. Explicar o modo de simulação como alternativa, ativado manualmente.
 9. Apresentar as limitações e os cuidados de segurança.
 10. Reforçar que o projeto é um protótipo educacional.
 
@@ -225,6 +225,6 @@ Uma ordem simples para a apresentação:
 - [ ] AD8232 com eletrodos posicionados.
 - [ ] BPM e SpO2 exibidos.
 - [ ] ECG aparecendo no gráfico.
-- [ ] Modo Simular funcionando como plano alternativo.
+- [ ] Simulação desligada por padrão e funcionando quando ativada.
 - [ ] Nenhuma senha ou chave real publicada.
 - [ ] Explicação de segurança preparada.

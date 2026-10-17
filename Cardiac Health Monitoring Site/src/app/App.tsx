@@ -9,7 +9,6 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type VStatus    = "normal" | "warning" | "critical";
-type SimMode    = "normal" | "alerta";
 type ChartTab   = "hr" | "rr" | "temp";
 type HistoryMetric = ChartTab;
 type MobileTab  = "sinais" | "alertas" | "saude" | "contatos";
@@ -486,13 +485,12 @@ export default function App() {
   const [spo2, setSpo2] = useState(98);
   const [ecg, setEcg] = useState<number | null>(null);
   const [ecgSamples, setEcgSamples] = useState<number[]>([]);
-  const [simMode,  setSimMode]  = useState<SimMode>("normal");
+  const [simulationEnabled, setSimulationEnabled] = useState(false);
   const [chartTab, setChartTab] = useState<ChartTab>("hr");
   const [mobileTab, setMobileTab] = useState<MobileTab>("sinais");
   const [history,  setHistory]  = useState<HistoryPoint[]>([]);
   const [events,   setEvents]   = useState<IrregEvent[]>([]);
   const eventId = useRef(1);
-  const simTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const serialPortRef = useRef<SerialPortLike | null>(null);
   const serialReaderRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const ecgSamplesRef = useRef<number[]>([]);
@@ -711,15 +709,14 @@ export default function App() {
 
   // ── Simulation ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (serialConnected) return;
+    if (serialConnected || !simulationEnabled) return;
     const id = setInterval(() => {
-      const em = simMode === "alerta";
-      setHr  (p => Math.max(40, Math.min(180, p + (em ? 128  : 74   - p) * 0.09 + (Math.random() - 0.5) * (em ? 9    : 4   ))));
-      setRr  (p => Math.max(6,  Math.min(35,  p + (em ? 25   : 15   - p) * 0.07 + (Math.random() - 0.5) * (em ? 3    : 1.5 ))));
-      setTemp(p => Math.max(34, Math.min(42,  p + (em ? 38.9 : 36.6 - p) * 0.04 + (Math.random() - 0.5) * (em ? 0.18 : 0.07))));
+      setHr  (p => Math.max(40, Math.min(180, p + (74 - p) * 0.09 + (Math.random() - 0.5) * 4)));
+      setRr  (p => Math.max(6,  Math.min(35,  p + (15 - p) * 0.07 + (Math.random() - 0.5) * 1.5)));
+      setTemp(p => Math.max(34, Math.min(42,  p + (36.6 - p) * 0.04 + (Math.random() - 0.5) * 0.07)));
     }, 1500);
     return () => clearInterval(id);
-  }, [simMode, serialConnected]);
+  }, [serialConnected, simulationEnabled]);
 
   // ── History + irregularity detection ────────────────────────────────────────
   useEffect(() => {
@@ -757,8 +754,7 @@ export default function App() {
   };
 
   const toggleSim = () => {
-    if (simMode === "alerta") { setSimMode("normal"); if (simTimer.current) clearTimeout(simTimer.current); }
-    else { setSimMode("alerta"); simTimer.current = setTimeout(() => setSimMode("normal"), 30_000); }
+    setSimulationEnabled(enabled => !enabled);
   };
 
   const handleNotify = (cid: number) => {
@@ -1039,10 +1035,10 @@ export default function App() {
           <button onClick={toggleSim}
             disabled={serialConnected}
             className="text-[10px] px-2.5 py-1.5 rounded-lg font-semibold border transition-all"
-            style={simMode==="alerta"
-              ?{background:"#FF4B6E18",borderColor:"#FF4B6E35",color:"#FF4B6E"}
+            style={simulationEnabled
+              ?{background:"#00D4A818",borderColor:"#00D4A835",color:"#00D4A8"}
               :{background:"rgba(255,255,255,0.04)",borderColor:"rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.3)"}}>
-            {simMode==="alerta"?"⚡ Ativo":"Simular"}
+            {simulationEnabled ? "Desativar simulação" : "Ativar simulação"}
           </button>
         </div>
       </header>
