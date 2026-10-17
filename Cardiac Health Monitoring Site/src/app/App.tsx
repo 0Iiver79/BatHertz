@@ -21,9 +21,6 @@ type ChartConfig = {
   domain: [number, number]; refLo: number; refHi: number;
 };
 
-const THINGSPEAK_URL =
-  "https://thingspeak.com/channels/3475870/charts/1?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=60&type=line&update=15";
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const COLOR: Record<VStatus, string> = {
@@ -1070,9 +1067,7 @@ export default function App() {
               </div>
             </div>
             <div className="h-[160px]">
-              {serialConnected && ecgSamples.length > 1
-                ? <ECGWave bpm={hrR} status={overall} samples={ecgSamples}/>
-                : <iframe src={THINGSPEAK_URL} className="w-full h-full border-0" title="ECG em Tempo Real" loading="lazy"/>}
+              <ECGWave bpm={hrR} status={overall} samples={serialConnected ? ecgSamples : []}/>
             </div>
           </div>
 
@@ -1135,9 +1130,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="h-[140px]">
-                  {serialConnected && ecgSamples.length > 1
-                    ? <ECGWave bpm={hrR} status={overall} samples={ecgSamples}/>
-                    : <iframe src={THINGSPEAK_URL} className="w-full h-full border-0" title="ECG em Tempo Real" loading="lazy"/>}
+                  <ECGWave bpm={hrR} status={overall} samples={serialConnected ? ecgSamples : []}/>
                 </div>
               </div>
 

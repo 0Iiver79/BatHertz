@@ -157,7 +157,7 @@ As bibliotecas devem ser instaladas pela Arduino IDE antes da compilação.
 - Web Serial funciona principalmente em Chrome e Edge.
 - O site não possui cadastro real de pacientes; o nome exibido é demonstrativo.
 - O projeto não armazena prontuários nem dados clínicos.
-- O ThingSpeak é usado como visualização auxiliar; o ECG USB é o caminho de demonstração em tempo real.
+- O ThingSpeak é opcional para uma futura versão via Wi-Fi; o site funciona sem API externa usando USB/Web Serial.
 - O cálculo de BPM e SpO2 depende do posicionamento dos sensores, ruído elétrico e qualidade do sinal.
 - O Arduino Uno possui limitações de memória e comunicação Serial.
 

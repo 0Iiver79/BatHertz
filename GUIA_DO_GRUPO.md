@@ -53,7 +53,7 @@ Chrome ou Edge
 Painel BatHerz na Vercel
 ```
 
-O ESP8266 é uma alternativa para enviar os dados por Wi-Fi ao ThingSpeak. Para o primeiro teste do painel, deve-se usar o cabo USB do Arduino, pois é mais simples verificar o funcionamento.
+O ESP8266 é uma alternativa futura para enviar os dados por Wi-Fi ao ThingSpeak. O painel atual funciona sem API externa usando o cabo USB do Arduino, que deve ser o caminho usado na apresentação.
 
 ## 4. Ligações principais
 
@@ -182,7 +182,7 @@ Explicar que o projeto é uma demonstração educacional, não um dispositivo m�
 - O circuito atual não possui sensor de temperatura.
 - O circuito atual não calcula frequência respiratória.
 - O nome do paciente exibido no painel é demonstrativo.
-- O ESP8266 e o ThingSpeak não são necessários para o primeiro teste por USB.
+- O ESP8266 e o ThingSpeak não são necessários para o funcionamento atual por USB.
 - O funcionamento real depende da qualidade da alimentação, dos eletrodos e do posicionamento do dedo.
 - O painel não deve ser usado para diagnóstico médico.
 
